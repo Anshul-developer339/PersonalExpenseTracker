@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+
+{% block title %}Analytics - Personal Expense Tracker{% endblock %}
+{% block page_title %}Analytics & Reports{% endblock %}
+
+{% block content %}
+<!-- Year Selector -->
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <form method="GET" class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label for="year" class="form-label">Year</label>
+                <select name="year" class="form-select" id="year">
+                    {% for y in range(year - 2, year + 3) %}
+                    <option value="{{ y }}" {% if year == y %}selected{% endif %}>
+                        {{ y }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-primary w-100">Update Analytics</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Summary Cards -->
+<div class="row g-4 mb-4">
+    <div class="col-md-4">
+        <div class="card shadow-sm">
+            <div class="card-body text-center">
+                <h6 class="text-muted mb-2">Average Monthly Expenses</h6>
+                <h3 class="text-primary">₹{{ "{:,.2f}".format(avg_monthly_expenses) }}</h3>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card shadow-sm">
+            <div class="card-body text-center">
+                <h6 class="text-muted mb-2">Highest Spending Category</h6>
+                <h3 class="text-danger">
+                    {% if highest_spending %}
+                    {{ highest_spending.category }}
+                    {% else %}
+                    N/A
+                    {% endif %}
+                </h3>
+                {% if highest_spending %}
+                <small class="text-muted">₹{{ "{:,.2f}".format(highest_spending.amount) }}</small>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card shadow-sm">
+            <div class="card-body text-center">
+                <h6 class="text-muted mb-2">Total Transactions</h6>
+                <h3 class="text-success">
+                    {{ transaction_counts.get('income', 0) + transaction_counts.get('expense', 0) }}
+                </h3>
+                <small class="text-muted">
+                    {{ transaction_counts.get('income', 0) }} income / {{ transaction_counts.get('expense', 0) }} expenses
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts -->
+<div class="row g-4 mb-4">
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="card-title mb-0">Monthly Income vs Expenses - {{ year }}</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="yearlyTrendChart" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="card-title mb-0">Expense by Category</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="categorySpendingChart" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Category Breakdown Table -->
+<div class="card shadow-sm">
+    <div class="card-header bg-white">
+        <h5 class="card-title mb-0">Category-wise Expense Breakdown</h5>
+    </div>
+    <div class="card-body">
+        {% if category_spending %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Category</th>
+                        <th class="text-end">Amount</th>
+                        <th class="text-end">% of Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% set total = category_spending|sum(attribute='amount') %}
+                    {% for item in category_spending %}
+                    <tr>
+                        <td>{{ item.category }}</td>
+                        <td class="text-end">₹{{ "{:,.2f}".format(item.amount) }}</td>
+                        <td class="text-end">{{ "{:.1f}".format((item.amount / total * 100) if total > 0 else 0) }}%</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr class="table-primary">
+                        <th>Total</th>
+                        <th class="text-end">₹{{ "{:,.2f}".format(total) }}</th>
+                        <th class="text-end">100%</th>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-4">
+            <p class="text-muted mb-0">No expense data for {{ year }}.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Yearly Trend Chart
+const yearlyTrend = {{ yearly_trend|tojson }};
+const trendCtx = document.getElementById('yearlyTrendChart').getContext('2d');
+new Chart(trendCtx, {
+    type: 'line',
+    data: {
+        labels: yearlyTrend.map(t => t.month),
+        datasets: [
+            {
+                label: 'Income',
+                data: yearlyTrend.map(t => t.income),
+                borderColor: 'rgba(22, 163, 74, 1)',
+                backgroundColor: 'rgba(22, 163, 74, 0.1)',
+                fill: true,
+                tension: 0.4
+            },
+            {
+                label: 'Expenses',
+                data: yearlyTrend.map(t => t.expenses),
+                borderColor: 'rgba(239, 68, 68, 1)',
+                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                fill: true,
+                tension: 0.4
+            }
+        ]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+            y: {
+                beginAtZero: true
+            }
+        }
+    }
+});
+
+// Category Spending Chart
+const categorySpending = {{ category_spending|tojson }};
+const categoryCtx = document.getElementById('categorySpendingChart').getContext('2d');
+new Chart(categoryCtx, {
+    type: 'doughnut',
+    data: {
+        labels: categorySpending.map(c => c.category),
+        datasets: [{
+            data: categorySpending.map(c => c.amount),
+            backgroundColor: [
+                '#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6',
+                '#EC4899', '#6366F1', '#14B8A6', '#F97316', '#84CC16'
+            ]
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom'
+            }
+        }
+    }
+});
+</script>
+{% endblock %}

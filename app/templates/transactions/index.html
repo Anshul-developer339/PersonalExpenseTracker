@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block title %}Transactions - Personal Expense Tracker{% endblock %}
+{% block page_title %}Transactions{% endblock %}
+
+{% block content %}
+<!-- Filters -->
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <form method="GET" class="row g-3">
+            <div class="col-md-2">
+                <select name="type" class="form-select">
+                    <option value="">All Types</option>
+                    <option value="income" {% if current_type == 'income' %}selected{% endif %}>Income</option>
+                    <option value="expense" {% if current_type == 'expense' %}selected{% endif %}>Expense</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select name="category" class="form-select">
+                    <option value="">All Categories</option>
+                    {% for cat in income_categories + expense_categories %}
+                    <option value="{{ cat }}" {% if current_category == cat %}selected{% endif %}>{{ cat }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <input type="date" name="start_date" class="form-control" value="{{ current_start }}">
+            </div>
+            <div class="col-md-2">
+                <input type="date" name="end_date" class="form-control" value="{{ current_end }}">
+            </div>
+            <div class="col-md-2">
+                <input type="text" name="search" class="form-control" placeholder="Search..." value="{{ current_search }}">
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100">Filter</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Add Transaction Button -->
+<div class="mb-3">
+    <a href="{{ url_for('transactions.add') }}" class="btn btn-primary">
+        <i class="bi bi-plus-lg me-2"></i>Add Transaction
+    </a>
+    <a href="{{ url_for('analytics.export_csv') }}" class="btn btn-outline-secondary">
+        <i class="bi bi-download me-2"></i>Export CSV
+    </a>
+</div>
+
+<!-- Transactions Table -->
+<div class="card shadow-sm">
+    <div class="card-body">
+        {% if transactions %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Type</th>
+                        <th>Category</th>
+                        <th>Description</th>
+                        <th class="text-end">Amount</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for transaction in transactions %}
+                    <tr>
+                        <td>{{ transaction.transaction_date }}</td>
+                        <td>
+                            <span class="badge {{ 'bg-success' if transaction.type == 'income' else 'bg-danger' }}">
+                                {{ transaction.type|capitalize }}
+                            </span>
+                        </td>
+                        <td>{{ transaction.category }}</td>
+                        <td>{{ transaction.description or '-' }}</td>
+                        <td class="text-end {{ 'text-success' if transaction.type == 'income' else 'text-danger' }}">
+                            {{ '+' if transaction.type == 'income' else '-' }}₹{{ "{:,.2f}".format(transaction.amount) }}
+                        </td>
+                        <td class="text-end">
+                            <a href="{{ url_for('transactions.edit', transaction_id=transaction.id) }}" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            <form method="POST" action="{{ url_for('transactions.delete', transaction_id=transaction.id) }}" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this transaction?');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-4">
+            <p class="text-muted mb-0">No transactions found. <a href="{{ url_for('transactions.add') }}">Add your first transaction</a></p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

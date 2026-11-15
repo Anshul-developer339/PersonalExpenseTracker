@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Personal Expense Tracker{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<!-- Summary Cards -->
+<div class="row g-4 mb-4">
+    <div class="col-xl-3 col-md-6">
+        <div class="stat-card income-card">
+            <div class="stat-icon">
+                <i class="bi bi-arrow-down-circle"></i>
+            </div>
+            <div class="stat-content">
+                <h6 class="stat-label">Total Income</h6>
+                <h3 class="stat-value text-success">₹{{ "{:,.2f}".format(total_income) }}</h3>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-3 col-md-6">
+        <div class="stat-card expense-card">
+            <div class="stat-icon">
+                <i class="bi bi-arrow-up-circle"></i>
+            </div>
+            <div class="stat-content">
+                <h6 class="stat-label">Total Expenses</h6>
+                <h3 class="stat-value text-danger">₹{{ "{:,.2f}".format(total_expenses) }}</h3>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-3 col-md-6">
+        <div class="stat-card balance-card">
+            <div class="stat-icon">
+                <i class="bi bi-wallet"></i>
+            </div>
+            <div class="stat-content">
+                <h6 class="stat-label">Current Balance</h6>
+                <h3 class="stat-value {{ 'text-success' if current_balance >= 0 else 'text-danger' }}">
+                    ₹{{ "{:,.2f}".format(current_balance) }}
+                </h3>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-3 col-md-6">
+        <div class="stat-card savings-card">
+            <div class="stat-icon">
+                <i class="bi bi-piggy-bank"></i>
+            </div>
+            <div class="stat-content">
+                <h6 class="stat-label">Monthly Savings</h6>
+                <h3 class="stat-value {{ 'text-success' if monthly_savings >= 0 else 'text-danger' }}">
+                    ₹{{ "{:,.2f}".format(monthly_savings) }}
+                </h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row -->
+<div class="row g-4 mb-4">
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="card-title mb-0">Monthly Income vs Expenses</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="incomeExpenseChart" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="card-title mb-0">Expense by Category</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="categoryChart" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Transactions -->
+<div class="row">
+    <div class="col-12">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">Recent Transactions</h5>
+                <a href="{{ url_for('transactions.index') }}" class="btn btn-sm btn-outline-primary">View All</a>
+            </div>
+            <div class="card-body">
+                {% if recent_transactions %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Type</th>
+                                <th>Category</th>
+                                <th>Description</th>
+                                <th class="text-end">Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for transaction in recent_transactions %}
+                            <tr>
+                                <td>{{ transaction.transaction_date }}</td>
+                                <td>
+                                    <span class="badge {{ 'bg-success' if transaction.type == 'income' else 'bg-danger' }}">
+                                        {{ transaction.type|capitalize }}
+                                    </span>
+                                </td>
+                                <td>{{ transaction.category }}</td>
+                                <td>{{ transaction.description or '-' }}</td>
+                                <td class="text-end {{ 'text-success' if transaction.type == 'income' else 'text-danger' }}">
+                                    {{ '+' if transaction.type == 'income' else '-' }}₹{{ "{:,.2f}".format(transaction.amount) }}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <p class="text-muted mb-0">No transactions yet. <a href="{{ url_for('transactions.add') }}">Add your first transaction</a></p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Add Button -->
+<div class="position-fixed bottom-0 end-0 p-4">
+    <a href="{{ url_for('transactions.add') }}" class="btn btn-primary rounded-circle btn-lg shadow">
+        <i class="bi bi-plus-lg"></i>
+    </a>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Income vs Expense Chart
+const monthlyTrend = {{ monthly_trend|tojson }};
+const incomeExpenseCtx = document.getElementById('incomeExpenseChart').getContext('2d');
+new Chart(incomeExpenseCtx, {
+    type: 'bar',
+    data: {
+        labels: monthlyTrend.map(t => t.month),
+        datasets: [
+            {
+                label: 'Income',
+                data: monthlyTrend.map(t => t.income),
+                backgroundColor: 'rgba(22, 163, 74, 0.8)',
+                borderColor: 'rgba(22, 163, 74, 1)',
+                borderWidth: 1
+            },
+            {
+                label: 'Expenses',
+                data: monthlyTrend.map(t => t.expenses),
+                backgroundColor: 'rgba(239, 68, 68, 0.8)',
+                borderColor: 'rgba(239, 68, 68, 1)',
+                borderWidth: 1
+            }
+        ]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+            y: {
+                beginAtZero: true
+            }
+        }
+    }
+});
+
+// Category Pie Chart
+const categoryBreakdown = {{ category_breakdown|tojson }};
+const categoryCtx = document.getElementById('categoryChart').getContext('2d');
+new Chart(categoryCtx, {
+    type: 'doughnut',
+    data: {
+        labels: categoryBreakdown.map(c => c.category),
+        datasets: [{
+            data: categoryBreakdown.map(c => c.amount),
+            backgroundColor: [
+                '#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6',
+                '#EC4899', '#6366F1', '#14B8A6', '#F97316', '#84CC16'
+            ]
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom'
+            }
+        }
+    }
+});
+</script>
+{% endblock %}

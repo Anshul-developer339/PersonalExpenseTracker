@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+
+{% block title %}Budgets - Personal Expense Tracker{% endblock %}
+{% block page_title %}Budget Management{% endblock %}
+
+{% block content %}
+<!-- Month/Year Selector -->
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <form method="GET" class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label for="month" class="form-label">Month</label>
+                <select name="month" class="form-select" id="month">
+                    {% for m in range(1, 13) %}
+                    <option value="{{ m }}" {% if current_month == m %}selected{% endif %}>
+                        {{ m }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="year" class="form-label">Year</label>
+                <select name="year" class="form-select" id="year">
+                    {% for y in range(current_year - 2, current_year + 3) %}
+                    <option value="{{ y }}" {% if current_year == y %}selected{% endif %}>
+                        {{ y }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-primary w-100">View Budgets</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Add Budget Form -->
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-white">
+        <h5 class="card-title mb-0">Add New Budget</h5>
+    </div>
+    <div class="card-body">
+        <form method="POST" action="{{ url_for('budgets.add') }}" class="row g-3">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="month" value="{{ current_month }}">
+            <input type="hidden" name="year" value="{{ current_year }}">
+            
+            <div class="col-md-4">
+                <label for="category" class="form-label">Category</label>
+                <select class="form-select" id="category" name="category" required>
+                    <option value="">Select Category</option>
+                    {% for cat in categories %}
+                    <option value="{{ cat }}">{{ cat }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="col-md-4">
+                <label for="monthly_limit" class="form-label">Monthly Limit (₹)</label>
+                <input type="number" step="0.01" class="form-control" id="monthly_limit" name="monthly_limit" 
+                       required min="0.01">
+            </div>
+            
+            <div class="col-md-4">
+                <label class="form-label">&nbsp;</label>
+                <button type="submit" class="btn btn-primary w-100">Add Budget</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Budgets List -->
+<div class="row">
+    {% if budgets %}
+    {% for item in budgets %}
+    {% set budget = item.budget %}
+    {% set spent = item.spent %}
+    {% set remaining = item.remaining %}
+    {% set utilization = item.utilization %}
+    <div class="col-lg-6 mb-4">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div>
+                        <h5 class="card-title mb-1">{{ budget.category }}</h5>
+                        <p class="text-muted mb-0">{{ budget.month }}/{{ budget.year }}</p>
+                    </div>
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-three-dots"></i>
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li>
+                                <form method="POST" action="{{ url_for('budgets.edit', budget_id=budget.id) }}" class="mb-2">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <input type="hidden" name="category" value="{{ budget.category }}">
+                                    <input type="hidden" name="monthly_limit" value="{{ budget.monthly_limit }}">
+                                    <button type="submit" class="dropdown-item">Edit</button>
+                                </form>
+                            </li>
+                            <li>
+                                <form method="POST" action="{{ url_for('budgets.delete', budget_id=budget.id) }}" onsubmit="return confirm('Are you sure you want to delete this budget?');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="dropdown-item text-danger">Delete</button>
+                                </form>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="mb-2">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span>₹{{ "{:,.2f}".format(spent) }} spent</span>
+                        <span>₹{{ "{:,.2f}".format(budget.monthly_limit) }} limit</span>
+                    </div>
+                    <div class="progress" style="height: 10px;">
+                        <div class="progress-bar {{ 'bg-success' if utilization < 50 else 'bg-warning' if utilization < 75 else 'bg-danger' if utilization < 100 else 'bg-dark' }}" 
+                             role="progressbar" 
+                             style="width: {{ utilization }}%">
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-between mt-1">
+                        <small class="text-muted">{{ "{:.0f}".format(utilization) }}% utilized</small>
+                        <small class="{{ 'text-success' if remaining > 0 else 'text-danger' }}">
+                            ₹{{ "{:,.2f}".format(remaining) }} remaining
+                        </small>
+                    </div>
+                </div>
+                
+                {% if utilization >= 75 %}
+                <div class="alert {{ 'alert-warning' if utilization < 90 else 'alert-danger' if utilization < 100 else 'alert-dark' }} alert-sm mb-0">
+                    <i class="bi bi-exclamation-triangle me-1"></i>
+                    {% if utilization >= 100 %}
+                    Budget exceeded!
+                    {% elif utilization >= 90 %}
+                    High spending warning!
+                    {% else %}
+                    Budget utilization warning!
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="col-12">
+        <div class="card shadow-sm">
+            <div class="card-body text-center py-4">
+                <p class="text-muted mb-0">No budgets set for {{ current_month }}/{{ current_year }}. Add your first budget above.</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
